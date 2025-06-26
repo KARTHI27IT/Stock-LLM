@@ -1,0 +1,15 @@
+#navbar{
+    display: flex;
+    justify-content: space-between;
+}
+
+nav{
+    background: black;
+    color: white !important;
+}
+
+nav li a{
+    color: white !important;
+    margin: 10px;
+    padding: 5px 10px !important;
+}
