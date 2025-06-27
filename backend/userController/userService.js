@@ -14,7 +14,7 @@ module.exports.userCreateService = async (UserDetails) => {
         var userModelData = new userSchemaModel({
             name: UserDetails.name,
             email: UserDetails.email,
-            password: UserDetails.password,
+            password: UserDetails.password
         });
 
         var result = await userModelData.save();
@@ -69,4 +69,19 @@ module.exports.userLoginService = async (UserDetails) => {
     console.error("Error in userLoginService:", error);
     return { status: false, message: 'Error: ' + error.message };
   }
+};
+
+
+module.exports.userDetailsService = async (UserDetails) => {
+    try {
+        const user = await userSchemaModel.findOne({ email: UserDetails.email });
+        if (user) {  
+            return { status: true, message: "Details retrived",user:user };
+        } else {
+            return { status: false, message: "User not found" };
+        }
+    } catch (error) {
+        console.error('Error occurred while creating user:', error);
+        return { status: false, message: "Error: " + error.message };
+    }
 };

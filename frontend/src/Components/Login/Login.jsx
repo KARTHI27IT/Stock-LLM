@@ -22,7 +22,7 @@ function Login() {
         if(result.status){
         setEmail('');
         setPassword('');
-        localStorage.setItem('userEmail', result.data.email);
+        localStorage.setItem('userEmail', result.data.user.email);
         localStorage.setItem('token', result.data.token);
         navigate('/dashboard');
         }
