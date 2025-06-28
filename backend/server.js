@@ -41,13 +41,14 @@ app.post('/generate-report', upload.array('screenshots'), async (req, res) => {
   }
 
   try {
+
     const ocrResults = await Promise.all(
       files.map(file =>
         Tesseract.recognize(file.buffer, 'eng').then(({ data }) => data.text)
       )
     );
+    
     const combinedText = ocrResults.join('\n\n---\n\n');
-
     const stockNames = extractStockNames(combinedText);
     const reportName = stockNames.length > 0 ? stockNames.join(', ') : `Report_${Date.now()}`;
 

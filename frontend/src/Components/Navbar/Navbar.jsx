@@ -53,10 +53,15 @@ const Navbar = () => {
                     Dashboard
                   </Link>
                 </li>
-                <li className="nav-item mt-2">
-                  <button className="nav-link active button" onClick={handleLogout}>
+                <li className="nav-item">
+                  <Link className="nav-link active button" to="/detailsTable">
+                    Stocks
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link active button" onClick={handleLogout}>
                     Logout
-                  </button>
+                  </Link>
                 </li>
               </>
             )}

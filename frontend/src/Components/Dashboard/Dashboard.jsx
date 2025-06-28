@@ -142,10 +142,6 @@ function Dashboard() {
         <button className="button mx-3" type="submit" disabled={loading}>
           {loading ? '⏳ Generating...' : '🚀 Generate Report'}
         </button>
-
-        <Link className="button mx-2" to="/detailsTable">next</Link>
-        <Link className="button mx-2" to="/stockDetails">next</Link>
-
       </form>
       
 
