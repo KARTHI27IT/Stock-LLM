@@ -59,7 +59,6 @@ INSTRUCTIONS:
 - Section 8 is a table or bullet list with accurate financial breakdown.
 
 REQUIRED SECTIONS:
-
 1. *Summary & Portfolio Characteristics*
 2. *Goal Alignment Grade*
 3. *Goal Alignment Percentage*
@@ -77,7 +76,7 @@ SECTION 8 FORMAT:
   - Current Value
 - Extract values from visible screenshot data. Be precise and avoid estimating.
 - Format as a table or structured list.
-`;
+    `;
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
@@ -101,6 +100,8 @@ SECTION 8 FORMAT:
 
     const rawReport = result.response.text();
     const report = cleanAndValidateReport(rawReport);
+    const assetSection = extractAssetBreakdown(report);
+    const assetList = parseAssets(assetSection);
 
     const reportsDir = path.join(__dirname, 'reports');
     if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
@@ -118,7 +119,8 @@ SECTION 8 FORMAT:
           reports: {
             reportName: `Investment Report - ${new Date().toLocaleDateString()}`,
             reportData: report,
-            reportPdf: publicPath
+            reportPdf: publicPath,
+            assets: assetList
           }
         }
       },
@@ -214,6 +216,46 @@ function cleanAndValidateReport(report) {
 
   return cleanedLines.join('\n');
 }
+
+function extractAssetBreakdown(report) {
+  const lines = report.split('\n');
+  const startIndex = lines.findIndex(line =>
+    /^8\.\s*\*Asset\s*Allocation\s*Breakdown\*/i.test(line)
+  );
+  if (startIndex === -1) return '';
+  return lines.slice(startIndex + 1).join('\n');
+}
+
+
+const parseAssets = (text) => {
+  const rows = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line =>
+      line &&
+      line.includes('|') &&
+      !line.toLowerCase().includes('asset name') &&
+      !line.includes('----')
+    );
+
+  const parsedRows = [];
+
+  for (const row of rows) {
+    const parts = row.split('|').map(cell => cell.trim()).filter(Boolean);
+    if (parts.length === 4) {
+      parsedRows.push({
+        assetName: parts[0],
+        assetType: parts[1],
+        investedValue: parts[2],
+        currentValue: parts[3]
+      });
+    }
+  }
+
+  return parsedRows;
+};
+
+
 
 app.get('/health', (req, res) => {
   res.json({

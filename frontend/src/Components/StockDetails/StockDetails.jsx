@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import Chart from "react-apexcharts";
 
 function StockDetails() {
   const { reportId } = useParams();
@@ -32,11 +33,7 @@ function StockDetails() {
         if (!foundReport) throw new Error("Report not found");
 
         const parsed = parseStructuredReport(foundReport.reportData || '');
-
-        setReport({
-          ...foundReport,
-          sections: parsed
-        });
+        setReport({ ...foundReport, sections: parsed });
       } catch (error) {
         console.error("Error fetching or parsing report:", error);
       } finally {
@@ -94,34 +91,33 @@ function StockDetails() {
     return sections;
   };
 
-const parseAssetTable = (text) => {
-  const rows = text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line =>
-      line &&
-      line.includes('|') &&
-      !line.toLowerCase().includes('asset name') &&
-      !line.includes('----')
-    );
+  const parseAssetTable = (text) => {
+    const rows = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line =>
+        line &&
+        line.includes('|') &&
+        !line.toLowerCase().includes('asset name') &&
+        !line.includes('----')
+      );
 
-  const parsedRows = [];
+    const parsedRows = [];
 
-  for (const row of rows) {
-    const parts = row.split('|').map(cell => cell.trim()).filter(Boolean);
-    if (parts.length === 4) {
-      parsedRows.push({
-        name: parts[0],
-        type: parts[1],
-        invested: parts[2],
-        value: parts[3]
-      });
+    for (const row of rows) {
+      const parts = row.split('|').map(cell => cell.trim()).filter(Boolean);
+      if (parts.length === 4) {
+        parsedRows.push({
+          name: parts[0],
+          type: parts[1],
+          invested: parts[2],
+          value: parts[3]
+        });
+      }
     }
-  }
 
-  return parsedRows;
-};
-
+    return parsedRows;
+  };
 
   const handleDownload = () => {
     if (report?.reportPdf) {
@@ -131,8 +127,24 @@ const parseAssetTable = (text) => {
     }
   };
 
+  const getPieChartData = () => {
+    const assets = parseAssetTable(report.sections.assets || '');
+
+    const series = assets.map(asset => {
+      const num = parseFloat(asset.value.replace(/[^0-9.-]+/g, ""));
+      return isNaN(num) ? 0 : num;
+    });
+
+    const labels = assets.map(asset => asset.name || "Unknown");
+    console.log(series);
+    console.log(labels);
+    return { series, labels };
+  };
+
   if (loading) return <p className="text-center mt-5">⏳ Loading...</p>;
   if (!report) return <p className="text-center mt-5 text-danger">⚠️ Report not found.</p>;
+
+  const { series, labels } = getPieChartData();
 
   return (
     <div className="container p-5 mt-4">
@@ -159,7 +171,7 @@ const parseAssetTable = (text) => {
           ) : null
         ))}
 
-        {/* Asset Allocation Breakdown */}
+        {/* Asset Allocation Table */}
         {report.sections.assets && (
           <div className="mb-4">
             <h5 className="text-primary">Asset Allocation Breakdown</h5>
@@ -185,15 +197,41 @@ const parseAssetTable = (text) => {
             </table>
           </div>
         )}
-      </div>
 
-      <button
-        className="btn btn-primary mt-3"
-        onClick={handleDownload}
-        disabled={!report.reportPdf}
-      >
-        📥 Download PDF Report
-      </button>
+        {/* Download Button */}
+        <button
+          className="btn btn-primary mt-3"
+          onClick={handleDownload}
+          disabled={!report.reportPdf}
+        >
+          📥 Download PDF Report
+        </button>
+
+        {series.length > 0 && (
+          <div className="mt-5">
+            <h4 className="text-success mb-3">📊 Asset Allocation Chart</h4>
+            <Chart
+              options={{
+                chart: {
+                  type: 'pie'
+                },
+                labels: labels,
+                legend: {
+                  position: 'bottom'
+                },
+                title: {
+                  text: 'Portfolio Distribution',
+                  align: 'center',
+                  style: { fontSize: '20px' }
+                }
+              }}
+              series={series}
+              type="pie"
+              height={350}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
