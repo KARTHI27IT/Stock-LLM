@@ -8,6 +8,7 @@ function StockDetails() {
   const [report, setReport] = useState(null);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [investedDates, setInvestedDates] = useState({});
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const email = localStorage.getItem("userEmail");
 
@@ -127,24 +128,26 @@ function StockDetails() {
     }
   };
 
-  const getPieChartData = () => {
-    const assets = parseAssetTable(report.sections.assets || '');
+const getPieChartData = () => {
+  const assets = parseAssetTable(report.sections.assets || '');
 
-    const series = assets.map(asset => {
-      const num = parseFloat(asset.value.replace(/[^0-9.-]+/g, ""));
-      return isNaN(num) ? 0 : num;
-    });
+  const series = assets.map(asset => {
+    const num = parseFloat(asset.invested.replace(/[^0-9.-]+/g, ""));
+    return isNaN(num) ? 0 : num;
+  });
 
-    const labels = assets.map(asset => asset.name || "Unknown");
-    console.log(series);
-    console.log(labels);
-    return { series, labels };
-  };
+  const labels = assets.map(asset => asset.name || "Unknown");
+  return { series, labels };
+};
+
 
   if (loading) return <p className="text-center mt-5">⏳ Loading...</p>;
   if (!report) return <p className="text-center mt-5 text-danger">⚠️ Report not found.</p>;
 
   const { series, labels } = getPieChartData();
+  const assets = parseAssetTable(report.sections.assets || '');
+
+  
 
   return (
     <div className="container p-5 mt-4">
@@ -171,7 +174,6 @@ function StockDetails() {
           ) : null
         ))}
 
-        {/* Asset Allocation Table */}
         {report.sections.assets && (
           <div className="mb-4">
             <h5 className="text-primary">Asset Allocation Breakdown</h5>
@@ -185,7 +187,7 @@ function StockDetails() {
                 </tr>
               </thead>
               <tbody>
-                {parseAssetTable(report.sections.assets).map((row, idx) => (
+                {assets.map((row, idx) => (
                   <tr key={idx}>
                     <td>{row.name}</td>
                     <td>{row.type}</td>
@@ -198,7 +200,6 @@ function StockDetails() {
           </div>
         )}
 
-        {/* Download Button */}
         <button
           className="btn btn-primary mt-3"
           onClick={handleDownload}
@@ -212,18 +213,15 @@ function StockDetails() {
             <h4 className="text-success mb-3">📊 Asset Allocation Chart</h4>
             <Chart
               options={{
-                chart: {
-                  type: 'pie'
-                },
+                chart: { type: 'pie' },
                 labels: labels,
-                legend: {
-                  position: 'bottom'
-                },
-                title: {
-                  text: 'Portfolio Distribution',
-                  align: 'center',
-                  style: { fontSize: '20px' }
-                }
+                legend: { position: 'bottom' },
+title: {
+  text: 'Portfolio Distribution (Invested Amount)',
+  align: 'center',
+  style: { fontSize: '20px' }
+}
+
               }}
               series={series}
               type="pie"
@@ -231,6 +229,51 @@ function StockDetails() {
             />
           </div>
         )}
+
+        {/* 📅 Modal to input investment dates */}
+        <button type="button" className="btn btn-primary mt-4" data-bs-toggle="modal" data-bs-target="#exampleModal">
+          Compare stocks with Nifty
+        </button>
+
+        <div className="modal fade" id="exampleModal" tabIndex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5" id="exampleModalLabel">Enter Investment Dates</h1>
+                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div className="modal-body">
+                {assets.map((row, idx) => (
+                  <div className="mb-3 row align-items-center" key={idx}>
+                    <div className="col-md-4 fw-semibold">{row.name}</div>
+                    <div className="col-md-8">
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={investedDates[row.name] || ''}
+                        onChange={(e) =>
+                          setInvestedDates({ ...investedDates, [row.name]: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => console.log("📤 Submitted Dates:", investedDates)}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
       </div>
     </div>
   );
