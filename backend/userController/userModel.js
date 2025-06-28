@@ -1,16 +1,21 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
+const reportSchema = new Schema({
+  reportName: { type: String },
+  reportData: { type: String },
+  reportPdf: { type: String }
+}, { _id: true }); 
+
 const userSchema = new Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    reportData:{type:String},
-    reportPdf:{type:String}
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  reports: [reportSchema] 
 });
 
 const userSchemaModel = mongoose.model('user', userSchema);
 
 module.exports = {
-    userSchemaModel
+  userSchemaModel
 };

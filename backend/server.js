@@ -15,14 +15,11 @@ const { userSchemaModel } = require('./userController/userModel');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ✅ Serve the reports folder statically
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
 
 const upload = multer({ storage: multer.memoryStorage() });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ✅ MongoDB Connect
 mongoose.connect("mongodb://localhost:27017/StockLLM", {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -50,6 +47,9 @@ app.post('/generate-report', upload.array('screenshots'), async (req, res) => {
       )
     );
     const combinedText = ocrResults.join('\n\n---\n\n');
+
+    const stockNames = extractStockNames(combinedText);
+    const reportName = stockNames.length > 0 ? stockNames.join(', ') : `Report_${Date.now()}`;
 
     const prompt = `
 You are a professional financial advisor AI. Analyze the portfolio data and provide a structured investment report.
@@ -96,13 +96,21 @@ REQUIRED SECTIONS:
 
     const filename = `${Date.now()}_${email.replace(/[@.]/g, '_')}_report.pdf`;
     const fullPath = path.join(reportsDir, filename);
-    const publicPath = `reports/${filename}`; // ✅ for download URL
+    const publicPath = `reports/${filename}`;
 
     await generatePDF(report, fullPath);
 
     const user = await userSchemaModel.findOneAndUpdate(
       { email },
-      { reportData: report, reportPdf: publicPath }, // ✅ store relative path
+      {
+        $push: {
+          reports: {
+            reportName,
+            reportData: report,
+            reportPdf: publicPath
+          }
+        }
+      },
       { new: true }
     );
 
@@ -110,7 +118,7 @@ REQUIRED SECTIONS:
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ report, pdfPath: publicPath }); // ✅ frontend will use http://localhost:5000/reports/filename.pdf
+    res.json({ report, pdfPath: publicPath });
 
   } catch (err) {
     console.error('❌ Error generating report:', err);
@@ -160,6 +168,25 @@ function generatePDF(text, filePath) {
     stream.on('finish', () => resolve());
     stream.on('error', reject);
   });
+}
+
+function extractStockNames(text) {
+  const lines = text.split('\n');
+  const stockPattern = /\b([A-Z]{3,6})\b/g;
+  const found = new Set();
+
+  for (let line of lines) {
+    const matches = line.match(stockPattern);
+    if (matches) {
+      matches.forEach(symbol => {
+        if (!['PORTFOLIO', 'TOTAL', 'VALUE', 'BUY', 'SELL'].includes(symbol)) {
+          found.add(symbol);
+        }
+      });
+    }
+  }
+
+  return Array.from(found).slice(0, 5);
 }
 
 async function safeGenerateContent(model, prompt, retries = 3, delay = 3000) {

@@ -144,6 +144,8 @@ function Dashboard() {
         </button>
 
         <Link className="button mx-2" to="/detailsTable">next</Link>
+        <Link className="button mx-2" to="/stockDetails">next</Link>
+
       </form>
       
 

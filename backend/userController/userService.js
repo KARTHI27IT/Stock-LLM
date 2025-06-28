@@ -36,7 +36,7 @@ module.exports.userLoginService = async (UserDetails) => {
     console.log("Normalized email:", cleanEmail);
 
     const user = await userSchemaModel.findOne({ email: cleanEmail });
-    console.log("User from DB:", user);
+    // console.log("User from DB:", user);
 
     if (!user) {
       return { status: false, message: 'User not found' };

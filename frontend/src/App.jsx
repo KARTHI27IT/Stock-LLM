@@ -6,6 +6,7 @@ import Login from './Components/Login/Login';
 import Signup from './Components/Signup/Signup';
 import Navbar from './Components/Navbar/Navbar';
 import Table from './Components/Table/Table';
+import StockDetails from './Components/StockDetails/StockDetails';
 
 function App() {
   const [count, setCount] = useState(0);
@@ -58,6 +59,15 @@ function App() {
             <>
               <Navbar />
               <Table />
+            </>
+          }
+        />
+        <Route
+          path="/stockDetails/:reportId"
+          element={
+            <>
+              <Navbar />
+              <StockDetails/>
             </>
           }
         />
