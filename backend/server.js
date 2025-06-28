@@ -1,6 +1,5 @@
 const express = require('express');
 const multer = require('multer');
-const Tesseract = require('tesseract.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cors = require('cors');
 const mongoose = require("mongoose");
@@ -23,8 +22,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 mongoose.connect("mongodb://localhost:27017/StockLLM", {
   useNewUrlParser: true,
   useUnifiedTopology: true
-})
-  .then(() => console.log("✅ MongoDB connected"))
+}).then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.log("❌ MongoDB error:", err));
 
 app.post("/user/signup", userController.userCreate);
@@ -41,31 +39,24 @@ app.post('/generate-report', upload.array('screenshots'), async (req, res) => {
   }
 
   try {
-
-    const ocrResults = await Promise.all(
-      files.map(file =>
-        Tesseract.recognize(file.buffer, 'eng').then(({ data }) => data.text)
-      )
-    );
-    
-    const combinedText = ocrResults.join('\n\n---\n\n');
-    const stockNames = extractStockNames(combinedText);
-    const reportName = stockNames.length > 0 ? stockNames.join(', ') : `Report_${Date.now()}`;
+    const imageParts = files.map(file => ({
+      inlineData: {
+        mimeType: file.mimetype,
+        data: file.buffer.toString('base64'),
+      }
+    }));
 
     const prompt = `
-You are a professional financial advisor AI. Analyze the portfolio data and provide a structured investment report.
-
-PORTFOLIO DATA (from multiple images):
-${combinedText}
+You are a professional financial advisor AI. Analyze the user's investment portfolio using the uploaded screenshots. Extract all visible financial information and generate a structured report.
 
 USER GOAL: "${goal}"
 
 INSTRUCTIONS:
-- Respond using EXACTLY 7 sections below in order.
+- Use ONLY the uploaded screenshots to extract data (don't assume or hallucinate).
+- Respond using EXACTLY 8 sections below in order.
 - Use exact titles and format like: 1. *Section Title*
 - Each section should be 2–4 short paragraphs.
-- Do NOT add intro or extra commentary.
-- Begin with section 1 and end after section 7.
+- Section 8 is a table or bullet list with accurate financial breakdown.
 
 REQUIRED SECTIONS:
 
@@ -76,19 +67,38 @@ REQUIRED SECTIONS:
 5. *Estimated 5-Year Return*
 6. *Where You Are Strong*
 7. *Where You Need to Improve*
+8. *Asset Allocation Breakdown*
+
+SECTION 8 FORMAT:
+- Accurately list each asset with:
+  - Asset name (e.g., NIFTYIETFR-EQ, GOLDBEES-EQ)
+  - Type (Stock, Gold, Crypto, Mutual Fund, etc.)
+  - Invested Amount
+  - Current Value
+- Extract values from visible screenshot data. Be precise and avoid estimating.
+- Format as a table or structured list.
 `;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-1.5-flash',
       generationConfig: {
         temperature: 0.2,
         topP: 0.9,
         topK: 40,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 3000,
       },
     });
 
-    const result = await safeGenerateContent(model, prompt);
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          ...imageParts
+        ],
+      }]
+    });
+
     const rawReport = result.response.text();
     const report = cleanAndValidateReport(rawReport);
 
@@ -106,7 +116,7 @@ REQUIRED SECTIONS:
       {
         $push: {
           reports: {
-            reportName,
+            reportName: `Investment Report - ${new Date().toLocaleDateString()}`,
             reportData: report,
             reportPdf: publicPath
           }
@@ -124,7 +134,7 @@ REQUIRED SECTIONS:
   } catch (err) {
     console.error('❌ Error generating report:', err);
     res.status(500).json({
-      error: 'Failed to process image(s) and generate report.',
+      error: 'Failed to generate report from screenshots.',
       message: err.message || 'Unknown error'
     });
   }
@@ -140,7 +150,7 @@ function generatePDF(text, filePath) {
 
     const sectionColors = {
       1: '#2c3e50', 2: '#2980b9', 3: '#27ae60',
-      4: '#d35400', 5: '#8e44ad', 6: '#16a085', 7: '#c0392b',
+      4: '#d35400', 5: '#8e44ad', 6: '#16a085', 7: '#c0392b', 8: '#7f8c8d'
     };
 
     const lines = text.split('\n');
@@ -171,39 +181,6 @@ function generatePDF(text, filePath) {
   });
 }
 
-function extractStockNames(text) {
-  const lines = text.split('\n');
-  const stockPattern = /\b([A-Z]{3,6})\b/g;
-  const found = new Set();
-
-  for (let line of lines) {
-    const matches = line.match(stockPattern);
-    if (matches) {
-      matches.forEach(symbol => {
-        if (!['PORTFOLIO', 'TOTAL', 'VALUE', 'BUY', 'SELL'].includes(symbol)) {
-          found.add(symbol);
-        }
-      });
-    }
-  }
-
-  return Array.from(found).slice(0, 5);
-}
-
-async function safeGenerateContent(model, prompt, retries = 3, delay = 3000) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await model.generateContent(prompt);
-    } catch (err) {
-      if (err.status === 503 && i < retries - 1) {
-        await new Promise(res => setTimeout(res, delay));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
-
 function cleanAndValidateReport(report) {
   report = report.trim().replace(/\r\n/g, '\n');
   const lines = report.split('\n');
@@ -214,7 +191,8 @@ function cleanAndValidateReport(report) {
     /^4\.\s*\*.*Risk.*Meter.*\*/i,
     /^5\.\s*\*.*Estimated.*5.*Year.*Return.*\*/i,
     /^6\.\s*\*.*Where.*Strong.*\*/i,
-    /^7\.\s*\*.*Where.*Improve.*\*/i
+    /^7\.\s*\*.*Where.*Improve.*\*/i,
+    /^8\.\s*\*.*Asset.*Allocation.*Breakdown.*\*/i
   ];
 
   let cleanedLines = [];
